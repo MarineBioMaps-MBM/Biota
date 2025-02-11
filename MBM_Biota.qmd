@@ -1,0 +1,73 @@
+---
+title: "MBM_Biota"
+author: "Maddy Enda"
+format: html
+editor: visual
+eval: true
+echo: true 
+warning: false
+message: false
+---
+
+### Load packages and preliminary exploration
+
+```{r}
+# Load relevant libraries
+library(tidyverse)
+library(dplyr)
+library(terra)
+library(tmap)
+library(sf)
+library(here)
+library(stars)
+library(janitor)
+```
+
+```{r}
+# Read in the pre-filtered Biota data set that only has CA observations
+biota_data <- readRDS("Biota.rds")
+```
+
+```{r}
+# Preliminary exploration of biota data
+colnames(biota_data)
+
+# Number of observations and columns for our df
+dim(biota_data)
+```
+
+```{r}
+# Load in the MPA boundary data
+MPA_boundary <- sf::st_read(here::here("data", "California_Marine_Protected_Areas_[ds582]"))
+
+mpa <- MPA_boundary %>%
+   clean_names() %>%
+  filter(name == "Point Lobos SMR") %>%
+  # Select relevant columns
+  select(-c("objectid", "ccr", "area_sq_mi", "study_regi", "fullname", "ccr_int", "shortname","acres", "shape_are", "shape_len")) %>%
+  mutate(area_km_mpa = hectares / 100) %>%  # Convert hectares to square km
+  select(-hectares)
+```
+
+### Join Biota data to MPA data
+
+```{r}
+# Check CRS of both data sets
+st_crs(biota_data)== st_crs(mpa)
+
+# Match CRS
+mpa <- st_transform(mpa, crs = st_crs(biota_data))
+
+# Perform spatial join: Keep MPA columns and match substrate data
+mpa_lobos <- st_join(mpa, biota_data, left = TRUE)
+```
+
+```{r}
+# Find percentage of each substrate in the MPA
+mpa_lobos <- mpa_lobos %>%
+  mutate(pct_sub = (shape_area / area_km_mpa) * 100) %>%  # Calculate percentage
+    filter(area_km_sub <= area_km_mpa)
+```
+
+
+
