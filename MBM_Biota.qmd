@@ -38,7 +38,7 @@ dim(biota_data)
 
 ```{r}
 # Load in the MPA boundary data
-MPA_boundary <- sf::st_read(here::here("data", "California_Marine_Protected_Areas_[ds582]"))
+MPA_boundary <- sf::st_read("data/California_Marine_Protected_Areas_[ds582]")
 
 mpa <- MPA_boundary %>%
    clean_names() %>%
@@ -63,11 +63,29 @@ mpa_lobos <- st_join(mpa, biota_data, left = TRUE)
 ```
 
 ```{r}
-# Find percentage of each substrate in the MPA
-mpa_lobos <- mpa_lobos %>%
-  mutate(pct_sub = (shape_area / area_km_mpa) * 100) %>%  # Calculate percentage
-    filter(area_km_sub <= area_km_mpa)
+# Convert the shape_area column in km
+
+# Reproject to a UTM Zone (Example: UTM Zone 10N for the U.S. West Coast)
+mpa_lobos <- st_transform(mpa_lobos, crs = 32610)  # Change EPSG based on your region
+
+# Calculate the area in square meters
+mpa_lobos$Biota_Area_m2 <- st_area(mpa_lobos$Shape_Area)
+
+# Convert to square kilometers
+mpa_lobos$Biota_Area_km2 <- mpa_lobos$Biota_Area_m2 / 1e6
+
+# Print first few rows with updated area values
+print(head(mpa_lobos[, c("Biota_Area_m2", "Biota_Area_km2")]))
 ```
 
+```{r}
+colnames(mpa_lobos)
+```
 
-
+```{r}
+# Find percentage of each biota in the MPA
+mpa_lobos <- mpa_lobos %>%
+  mutate(pct_biota = (Biota_Area_km2 / area_km_mpa) * 100) %>%  
+  # Calculate percentage
+    filter(Biota_Area_km2 <= area_km_mpa)
+```
