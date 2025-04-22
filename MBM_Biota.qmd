@@ -116,13 +116,15 @@ head(mpa_group)
 
 ```{r}
 # Visualize results
-ggplot(mpa_group, aes(x = CMECS_BC_Category, y = pct_mpa_biota)) +
+ggplot(mpa_group, aes(x = CMECS_BC_Category, y = pct_mpa_biota, fill= CMECS_BC_Category)) +
   geom_col() +
   labs(title = "Marine Biota Type by Area(km2) in Point Lobos SMR",
        x = "Biota Category",
        y = "Percentage") +
   theme_bw() +
-  geom_text(aes(label = round(pct_mpa_biota, 2), hjust = 0.5, vjust = 0.01)) 
+    scale_fill_manual(values = c('seagreen3','green4' )) +
+  geom_text(aes(label = round(pct_mpa_biota, 2), hjust = 0.5, vjust = 0.01)) +
+  theme(legend.position = 'none')
 ```
 
 ### Substrate Data: Filter and explore
@@ -196,28 +198,28 @@ mpa_lobos_total <- mpa_lobos_total %>%
 colnames(mpa_lobos_total)
 ```
 
-
-
 ```{r}
 # Group the data by substrate group
-mpa_group_total <- mpa_lobos_total %>%
-  group_by(group, CMECS_BC_Category) %>%
+mpa_group_sub <- mpa_lobos_total %>%
+  group_by(group) %>%
   summarise(
     sum_sb = sum(area_km_sub, na.rm = TRUE),
-    sum_mpa = sum(area_km_mpa, na.rm = TRUE),
-    sum_biota = sum(Biota_Area_km2, na.rm = TRUE))  %>%
-  mutate(pct_substrate = (sum_sb / sum_mpa) * 100)  %>%
-  mutate(pct_biota = (sum_biota / sum_mpa) * 100) 
+    sum_mpa = sum(area_km_mpa, na.rm = TRUE))  %>%
+  mutate(pct_substrate = (sum_sb / sum_mpa) * 100)
 ```
-
-### Making a treemap for Point Lobos MPA
 
 ```{r}
-treemap(data,
-    index = c("group", "subgroup"), vSize = "value",
-    type = "index", # How you color the treemap. type help(treemap) for more info
-    palette = "Set1", # Select your color palette from the RColorBrewer presets or make your own.
-    title = "My Treemap", # Customize your title
-    fontsize.title = 12, # Size of the title
-)
+# Visualize results
+ggplot(mpa_group_sub, aes(x = group, y = pct_substrate, fill= group)) +
+  geom_col() +
+  labs(title = "Marine Substrate Type by Area(km2) in Point Lobos SMR",
+       x = "Substrate Category",
+       y = "Percentage") +
+  theme_bw() +
+    scale_fill_manual(values = c('peachpuff4','beige' )) +
+  geom_text(aes(label = round(pct_substrate, 2), hjust = 0.5, vjust = 0.01)) +
+  theme(legend.position = 'none')
 ```
+
+
+

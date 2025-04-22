@@ -1,0 +1,88 @@
+---
+title: "bioregion socal biota analysis"
+author: "Maddy Enda"
+format: html
+editor: visual
+---
+
+### Call libraries
+
+```{r}
+# Load in the packages for this data analysis
+librarian::shelf(tidyverse, dplyr, terra, tmap, sf, here, stars, janitor, units)
+```
+
+### Load in our biota data
+
+```{r}
+# Read in the pre-filtered Biota data set that only has CA observations
+biota_data <- readRDS("biota.rds")
+```
+
+```{r}
+# Remove the unclassified observations
+biota_clean <- biota_data %>%
+  filter(cmecs_bc_category != "Unclassified")
+```
+
+```{r}
+# Filter to only Southern California biota
+socal_biota <- biota_clean %>%
+  filter(pmep_region == 4) # Our regions are numbered 1-4, north to south
+```
+
+### Load in MPA Boundaries
+
+```{r}
+# Load in the MPA boundary data
+MPA_boundary <- sf::st_read("data/California_Marine_Protected_Areas_[ds582]")
+
+# Filter to Point Lobos locations
+mpa <- MPA_boundary %>%
+   clean_names()
+```
+### Join the Biota and MPAs
+```{r}
+# Match the crs of the data
+socal_biota <- st_transform(socal_biota, crs= 32610)
+mpa <- st_transform(mpa, crs= 32610)
+```
+
+```{r}
+# Join the data sets together
+socal_biota_mpa <- st_intersection(socal_biota, mpa)
+```
+
+### Calculate percentages of each biota type
+```{r}
+# Calculate area for each data set
+socal_biota_mpa$mpa_area_m2 <- st_area(socal_biota_mpa)
+
+# Create a sum of area column in mpa_transform
+socal_biota_mpa4 <- socal_biota_mpa %>%
+  group_by(type, cmecs_bc_category) %>%  # Group by MPA type, substrate group
+  summarise(
+    biota_area_m2 = sum(mpa_area_m2, na.rm = TRUE),  
+    total_mpa_area_m2 = first(shape_are)  
+  ) %>%
+  mutate(pct_biota = (biota_area_m2 / total_mpa_area_m2) * 100)
+```
+
+### Bar Graph of Biota Types within SoCal MPAs
+```{r}
+# Find percentage of each biota in the MPA
+# Visualize results
+ggplot(socal_biota_mpa4, aes(x = cmecs_bc_category, y = pct_biota, fill = cmecs_bc_category)) +
+  geom_col() +
+  labs(title = "Biota type by Area(m2) in SoCal",
+       x = "Biota Group",
+       y = "Percentage") +
+  geom_text(aes(label = round(pct_biota, 2), hjust = 0.5, vjust = 0.01)) +
+  theme_bw() +
+  scale_fill_manual(values = c('aquamarine3','#A5CEA4', 'pink', 'skyblue', 'lavender', 'seagreen', 'cadetblue' )) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "right",
+        legend.title = element_blank(),
+    axis.text.x = element_blank())
+```
+
