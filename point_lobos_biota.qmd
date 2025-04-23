@@ -1,0 +1,192 @@
+---
+title: "California_Biota"
+author: "Maddy Enda"
+format: html
+editor: visual
+---
+
+### Call libraries
+
+```{r}
+# Load in the packages for this data analysis
+librarian::shelf(tidyverse, dplyr, terra, tmap, sf, here, stars, janitor, units, kable)
+```
+
+### Load in the California biota data
+
+```{r}
+# Read in the pre-filtered Biota data set that only has CA observations
+biota_data <- readRDS("biota.rds")
+```
+
+```{r}
+# Remove the unclassified observations
+biota_clean <- biota_data %>%
+  filter(cmecs_bc_category != "Unclassified")
+
+unique(biota_clean$cmecs_bc_category)
+```
+
+```{r}
+# Load in the MPA boundary data
+MPA_boundary <- sf::st_read("data/California_Marine_Protected_Areas_[ds582]")
+
+# Filter to Point Lobos locations
+mpa <- MPA_boundary %>%
+   clean_names() %>%
+  filter(shortname == "Point Lobos")
+```
+
+```{r}
+# Reproject to UTM 10
+biota_transform <- st_transform(biota_clean, crs= 32610)
+
+mpa_transform <- st_transform(mpa, crs= 32610)
+```
+
+```{r}
+# Join the data sets together
+biota_mpa <- st_intersection(biota_transform, mpa_transform)
+```
+
+```{r}
+# Calculate area for each data set
+biota_mpa$mpa_area_m <- st_area(biota_mpa)
+```
+
+```{r}
+# Create a sum of area column in mpa_transform
+biota_mpa3 <- biota_mpa %>%
+  group_by(type, cmecs_bc_category) %>%  # Group by MPA type, substrate group
+  summarise(
+    biota_area_m2 = sum(mpa_area_m, na.rm = TRUE),  
+    total_mpa_area_m2 = first(shape_are)  
+  ) %>%
+  mutate(pct_biota = (biota_area_m2 / total_mpa_area_m2) * 100) 
+```
+
+```{r}
+# Find percentage of each biota in the MPA
+# Visualize results
+ggplot(biota_mpa3, aes(x = cmecs_bc_category, y = pct_biota, fill = cmecs_bc_category)) +
+  geom_col() +
+  labs(title = "Biota type by Area(m2) in Point Lobos SMR+SMCA",
+       x = "Biota Group",
+       y = "Percentage") +
+  geom_text(aes(label = round(pct_biota, 2), hjust = 0.5, vjust = 0.01)) +
+  theme_bw() +
+  scale_fill_manual(values = c('aquamarine3','#A5CEA4', 'plum')) +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "top",
+        legend.title = element_blank(),
+    axis.text.x = element_blank() ) + 
+  facet_wrap(~type)
+```
+
+```{r}
+tm_shape(mpa_transform) +
+  tm_polygons(col = "white") +
+tm_shape(biota_mpa3)+
+  tm_polygons(col= 'cmecs_bc_category', 
+              palette= c('aquamarine3','#A5CEA4'),
+              title= "Biota Type") +
+  tm_layout(legend.position = c(0.05, 0.80)) 
+```
+
+```{r}
+# Make pie chart using facets
+p1 <- ggplot(biota_mpa3, aes(x = "", y = pct_biota, fill = cmecs_bc_category)) +
+  geom_col(width = 1, color = "white") +  
+  coord_polar(theta = "y", start = 0) +  # Convert to pie chart
+  
+  facet_wrap(~type) +  
+  
+  labs(title = "Biota Type in Point Lobos SMR & SMCA",
+       x = NULL,
+       y = NULL,
+       fill = "Biota Type") +
+  
+  geom_text(aes(label = paste0(round(pct_biota, 1), "%")), 
+            position = position_stack(vjust = 0.5),
+            color = "black",
+            size = 4) +
+  
+  theme_minimal() +
+  
+  scale_fill_manual(values = c('aquamarine3', '#A5CEA4')) + 
+  
+  theme(axis.text = element_blank(),  # Remove axis labels
+        axis.ticks = element_blank(),
+        panel.grid = element_blank(),
+        legend.position = "bottom") 
+```
+
+```{r}
+p1
+```
+
+```{r}
+# SMR Pie Chart
+p2 <- biota_mpa3 %>%
+  filter(type == "SMR") %>%
+  ggplot(aes(x = "", y = pct_biota, fill = cmecs_bc_category)) +
+  geom_col(width = 1, color = "white") +
+  coord_polar(theta = "y", start = 0) +
+  
+  labs(title = "Biota Type in Point Lobos SMR", 
+       x = NULL, 
+       y = NULL, 
+       fill = "Biota Type") +
+  
+  geom_text(aes(label = paste0(round(pct_biota, 1), "%")),
+            position = position_stack(vjust = 0.5),
+            color = "white", size = 4) +
+  
+  theme_minimal() +
+  
+  scale_fill_manual(values = c('aquamarine3','#A5CEA4')) + 
+  
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid = element_blank(),
+        legend.position = "bottom",
+        legend.title = element_text(size=6),
+        legend.text = element_text(size=6),
+        title = element_text(size= 8),
+        legend.key.size = unit(.4, 'cm'),
+        plot.background = element_rect(fill = '#E3DFD7', color = '#E3DFD7'))
+
+p2
+```
+
+```{r}
+# Convert necessary columns to numeric and clean up the data
+mpa_area_table <- biota_mpa3 %>%
+  mutate(
+    biota_area_m2 = as.numeric(gsub(" \\[m\\^2\\]", "", biota_area_m2)),  # Remove units and convert to numeric
+    total_mpa_area_m2 = as.numeric(total_mpa_area_m2)  # Ensure total area is numeric
+  ) %>%
+  group_by(cmecs_bc_category) %>%  # Group by substrate type
+  summarise(
+    total_biota_area = sum(biota_area_m2, na.rm = TRUE),
+    total_area = sum(total_mpa_area_m2, na.rm = TRUE)
+  ) %>%
+  mutate(
+    pct_biota = (total_biota_area / total_area) * 100  # Calculate percentage of substrate
+  ) %>%
+  select(Type = cmecs_bc_category, Percentage = pct_biota)  
+
+# Create the table with kable format
+mpa_area_table %>%
+  st_drop_geometry() %>% 
+  mutate(Percentage = sprintf("%.2f%%", Percentage)) |>  
+  kable(format = "html", align = "l") |>  # Left-align columns
+  kable_styling(full_width = FALSE, position = "center", font_size = 10) |>  
+  column_spec(2, color = "#002f41") |>  # Change text color for percentages
+  add_header_above(c("Biota Areas in Point Lobos SMR and SMCA" = 2), bold = TRUE) |>
+  footnote(general = "Biota areas classified by the\nPacific Marine and Estuarine Partnership (PMEP)")
+```
+
+```{r}
+library(kableExtra)
+```
