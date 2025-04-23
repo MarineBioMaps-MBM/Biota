@@ -1,0 +1,38 @@
+---
+title: "write_biota_rds"
+author: "Maddy Enda"
+format: html
+editor: visual
+---
+
+### Our method for writing the PMEP Biotic Components to a filtered CA .RDS
+
+```{r}
+# Load in the packages for this data analysis
+librarian::shelf(tidyverse, dplyr, terra, tmap, sf, here, stars, janitor, units)
+```
+
+```{r}
+# Unpack the biota layer and filter to only California observations
+biota_data <- sf::read_sf(here::here("data", "PMEP_biotic_substrate.gdb"),
+                           layer= "West_Coast_USA_Nearshore_CMECS_Biotic_Habitat") %>% filter(State == "CA") %>%
+# Change colnames to lower snake case
+  janitor::clean_names()
+```
+
+```{r}
+# Transform the crs to put area column in meters squared
+biota <- st_transform(biota_data, crs= 32610)
+
+# Calculate area for the biota data
+biota$area_m2 <- st_area(biota)
+
+# Create area column in hectares to match convention 
+biota <- biota %>%
+  mutate(area_hectares = area_m2 / 10000)
+```
+
+```{r}
+# Save the substrate data as a .rds file
+saveRDS(biota_data, file="biota.rds")
+```
