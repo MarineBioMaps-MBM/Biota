@@ -56,7 +56,7 @@ Zostera sp..
 
 Shapefiles for CA MPA Boundaries were downloaded from the [California Department of Fish and Wildlife](https://data.ca.gov/dataset/california-marine-protected-areas-ds582).
 
-## File Contents
+### File Contents
 
 The Quarto Markdown files in this repository house the various analysis run to answer questions about MPA habitat components on a statewide, regional, or MPA specific level. The .qmd files are named for the respective areas being analyzed. 
 
