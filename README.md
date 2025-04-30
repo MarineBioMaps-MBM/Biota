@@ -2,6 +2,8 @@
 
 ## Analysis conducted by Madison Enda to evaluate biotic cover and habitat distribution in California MPAs, as part of the MarineBioMaps Capstone Project. 
 
+### Contributors: Bailey Jorgensen, Michelle Yiv, Cori Lopazanski, Samantha Stevenson-Karl
+
 The Pacific Marine and Estuarine Partnership (PMEP) utilized the Coastal & Marine Ecological Classification Standard (CMECS) to define major biotic categories:
 
 - **Aquatic Vegetation Bed:** This class includes subtidal or intertidal bottoms and any other areas characterized by a dominant
