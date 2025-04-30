@@ -43,3 +43,17 @@ Zostera sp..
 .rds files created in the rds_creation repository from this MarineBioMaps Github Organization were used to load in the PMEP data filtered to California. See those repositories to access these .rds files. 
 
 Shapefiles for CA MPA Boundaries were downloaded from the [California Department of Fish and Wildlife](https://data.ca.gov/dataset/california-marine-protected-areas-ds582).
+
+### Repository Structure:
+```
+biota
+│  └──README.md
+|  └──bioregion_analysis
+|     └──nccsr_substrate.qmd
+|     └──scsr_substrate.qmd
+|     └──ncsr_substrate.qmd
+|     └──ccsr_substrate.qmd
+│  └──pointlobos_substrate_analysis
+|  └──statewide_substrate_analysis
+|  └──saving_substrate_data
+```
