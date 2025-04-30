@@ -4,6 +4,18 @@
 
 ### Contributors: Bailey Jorgensen, Michelle Yiv, Cori Lopazanski, Samantha Stevenson-Karl
 
+This is a statewide and regional analysis, with summary statistics and mapping being conducted statewide, and also on a regional level. For the regional analysis, we utilized the 5 distinct regions defined by the California Department of Fish and Wildlife and the Marine Life Protection Act. They are definited as such:
+
+**SCSR** = South Coast Study Region
+
+**NCCSR** = North Central Coast Study Region
+
+**CCSR** = Central Coast Study Region
+
+**NCSR** = North Coast Study Region
+
+**SFBSR** = San Francisco Bay Study Region
+
 The Pacific Marine and Estuarine Partnership (PMEP) utilized the Coastal & Marine Ecological Classification Standard (CMECS) to define major biotic categories:
 
 - **Aquatic Vegetation Bed:** This class includes subtidal or intertidal bottoms and any other areas characterized by a dominant
