@@ -1,0 +1,161 @@
+---
+title: "statewide_biota_analysis"
+author: "Maddy Enda"
+format: html
+editor: visual
+---
+
+### Call libraries
+
+```{r}
+# Load in the packages for this data analysis
+librarian::shelf(tidyverse, dplyr, terra, tmap, sf, here, stars, janitor, units, showtext)
+# Adding in our text
+font_add_google("Montserrat", "montserrat")
+showtext_auto()
+```
+
+### Assign palette
+
+```{r}
+# Create palette
+biota_pal <- c("seagreen", "#A3AD62FF", "#D0D3A2", "#798234FF", "#F0C6C3FF", "#DF91A3FF", "#D46780FF" )
+```
+
+### Load in our biota data
+
+```{r}
+# Read in the prefiltered biota data from the database
+rds.dir <- "/capstone/marinebiomaps/data/rds-files"
+ca_biota <- readRDS(file.path(rds.dir, "biota.rds"))
+```
+
+```{r}
+# Remove the unclassified observations
+ca_biota_clean <- ca_biota %>%
+  filter(cmecs_bc_category != "Unclassified")
+```
+
+### Find Percentage of each Biota type in SoCal
+
+```{r}
+# Drop the geometries to speed up run time
+ca_biota_simple <- ca_biota_clean %>%
+  st_drop_geometry()
+```
+
+```{r}
+# Create a column that has the total area of socal biota
+ca_biota_simple <- ca_biota_simple %>%
+  filter(cmecs_bc_category != "Floating/Suspended Plants and Macroalgae") %>%
+  mutate(total_area = sum(area_ha))
+
+# Create a sum of area column in mpa_transform
+ca_biota_simple_2 <- ca_biota_simple %>%
+  group_by(cmecs_bc_category) %>%  # Group by MPA type, substrate group
+  summarise(
+    biota_area = sum(area_ha, na.rm = TRUE),  
+    total_area = first(total_area)  
+  ) %>%
+  mutate(pct_biota = (biota_area / total_area) * 100)
+```
+
+```{r}
+# Visualize results
+ggplot(ca_biota_simple_2, aes(x = reorder(cmecs_bc_category, pct_biota), y = pct_biota, fill = cmecs_bc_category)) +
+  geom_col() +
+  labs(title = " Statewide Coastal & Marine California Biota Distribution",
+       y = "Percentage of Total Biota") +
+    geom_text(aes(label = paste0(round(pct_biota, 1), "%"), hjust = 0.5, vjust = 0.01, size= 4, family= "montserrat"),) +  
+  geom_text(aes(label = paste0(round(pct_biota, 1), "%"), hjust = 0.5, vjust = 0.01, size= 4, family= "montserrat")) +
+  theme_classic() +
+  scale_fill_manual(values = biota_pal) +
+  theme(plot.title = element_text(family= "montserrat", size= 20),
+        legend.position = "none",
+        legend.title = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y= element_text(size= 10, family= "montserrat"),
+    axis.title.y = element_blank(),
+    axis.title.x= element_text(size= 10, family= "montserrat")
+     )+
+  coord_flip()
+```
+
+# Find the biota distribution within MPAs
+
+### Load in MPA Boundaries
+
+```{r}
+# Load in the MPA boundary data
+MPA_boundary <- sf::st_read("data/California_Marine_Protected_Areas_[ds582]")
+
+# Filter to Point Lobos locations
+mpa <- MPA_boundary %>%
+   clean_names()
+```
+# Intersect the MPA and CA Biota Geometries
+```{r}
+# Reproject to UTM 10
+biota_transform <- st_transform(ca_biota_clean, crs= 32610)
+
+mpa_transform <- st_transform(mpa, crs= 32610)
+```
+
+```{r}
+# Join the data sets together
+ca_biota_mpa <- st_intersection(biota_transform, mpa_transform)
+```
+
+
+```{r}
+head(ca_biota_mpa)
+```
+
+```{r}
+# Drop the geometries to speed up run time
+ca_biota_mpa_simple<- ca_biota_mpa %>%
+  st_drop_geometry()
+```
+
+
+# Find new area of biota coverage
+
+```{r}
+# Create a column that is the sum of all biota area in hectares in MPAs
+ca_biota_mpa_simple$total_biota <- sum(ca_biota_mpa_simple$area_ha)
+
+ca_biota_mpa_simple <- ca_biota_mpa_simple %>%
+    filter(cmecs_bc_category != "Floating/Suspended Plants and Macroalgae") 
+
+# Create a sum of area column in mpa_transform
+ca_biota_mpa_bar <- ca_biota_mpa_simple %>%
+  group_by(cmecs_bc_category) %>%  # Group by MPA type, substrate group
+  summarise(
+    biota_area_m2 = sum(area_ha, na.rm = TRUE),  
+    total_mpa_area_m2 = first(total_biota)  
+  ) %>%
+  mutate(pct_biota = (biota_area_m2 / total_mpa_area_m2) * 100) 
+```
+
+# Visualize the trends
+```{r}
+# Visualize results
+ggplot(ca_biota_mpa_bar, aes(x = reorder(cmecs_bc_category, pct_biota), y = pct_biota, fill = cmecs_bc_category)) +
+  geom_col() +
+  labs(title = " Statewide Coastal & Marine California \n\ Biota Distribution Within MPAs",
+       y = "Percentage of Total Biota") +
+    geom_text(aes(label = paste0(round(pct_biota, 1), "%"), hjust = 0.5, vjust = 0.01, size= 4, family= "montserrat"),) +  
+  geom_text(aes(label = paste0(round(pct_biota, 1), "%"), hjust = 0.5, vjust = 0.01, size= 4, family= "montserrat")) +
+  theme_classic() +
+  scale_fill_manual(values = biota_pal) +
+  theme(plot.title = element_text(family= "montserrat", size= 20),
+        legend.position = "none",
+        legend.title = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y= element_text(size= 10, family= "montserrat"),
+    axis.title.y = element_blank(),
+    axis.title.x= element_text(size= 10, family= "montserrat")
+     )+
+  coord_flip()
+```
+
