@@ -1,0 +1,74 @@
+---
+title: "bioregion_norcal_biota_analysis"
+author: "Maddy Enda"
+format: html
+editor: visual
+---
+
+### Call libraries
+
+```{r}
+# Load in the packages for this data analysis
+librarian::shelf(tidyverse, dplyr, terra, tmap, sf, here, stars, janitor, units)
+```
+
+### Load in our biota data
+
+```{r}
+# Read in the prefiltered biota data from the database
+rds.dir <- "/capstone/marinebiomaps/data/rds-files"
+norcal_biota <- readRDS(file.path(rds.dir, "ncsr_biota.rds"))
+```
+
+```{r}
+# Remove the unclassified observations
+biota_clean <- norcal_biota %>%
+  filter(cmecs_bc_category != "Unclassified")
+```
+
+### Find Percentage of each Biota type in SoCal
+
+```{r}
+# Drop the geometries to speed up run time
+norcal_biota_simple <- biota_clean %>%
+  st_drop_geometry()
+```
+
+```{r}
+# Create a column that has the total area of socal biota
+norcal_biota_simple <- norcal_biota_simple %>%
+  filter(cmecs_bc_category != "Floating/Suspended Plants and Macroalgae") %>%
+  mutate(total_area = sum(area_ha))
+
+# Create a sum of area column in mpa_transform
+norcal_biota_simple_2 <- norcal_biota_simple %>%
+  group_by(cmecs_bc_category) %>%  # Group by MPA type, substrate group
+  summarise(
+    biota_area = sum(area_ha, na.rm = TRUE),  
+    total_area = first(total_area)  
+  ) %>%
+  mutate(pct_biota = (biota_area / total_area) * 100)
+```
+
+```{r}
+# Find percentage of each biota in the SoCal
+# Visualize results
+ggplot(norcal_biota_simple_2, aes(x = reorder(cmecs_bc_category, pct_biota), y = pct_biota, fill =  cmecs_bc_category)) +
+  geom_col() +
+  labs(title = " Biota Distribution in the \n\ Northern California Bioregion (NCSR) MPAs",
+       y = "Percentage of Total Biota") +
+    geom_text(aes(label = paste0(round(pct_biota, 1), "%"), hjust = 0.5, vjust = 0.01, size= 1, family= "montserrat"),) +  
+  geom_text(aes(label = paste0(round(pct_biota, 1), "%"), hjust = 0.5, vjust = 0.01, size= 1, family= "montserrat")) +
+  theme_classic() +
+  scale_fill_manual(values = biota_pal) +
+  theme(plot.title = element_text(family= "montserrat", size= 15),
+        legend.position = "none",
+        legend.title = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y= element_text(size= 10, family= "montserrat"),
+    axis.title.y = element_blank(),
+    axis.title.x= element_text(size= 10, family= "montserrat")
+     )+
+  coord_flip()
+```
+
