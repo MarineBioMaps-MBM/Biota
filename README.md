@@ -66,11 +66,9 @@ The Quarto Markdown files in this repository house the various analysis run to a
 biota
 │  └──README.md
 |  └──bioregion_analysis
-|     └──nccsr_substrate.qmd
-|     └──scsr_substrate.qmd
-|     └──ncsr_substrate.qmd
-|     └──ccsr_substrate.qmd
-│  └──pointlobos_substrate_analysis
-|  └──statewide_substrate_analysis
-|  └──saving_substrate_data
+|     └──bioregion_central_biota_analysis.qmd
+|     └──bioregion_norcal_biota_analysis.qmd
+|     └──bioregion_socal_biota_analysis.qmd
+│  └──point_lobos_biota.qmd
+|  └──write_to_rds.qmd
 ```
