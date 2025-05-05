@@ -66,9 +66,9 @@ The Quarto Markdown files in this repository house the various analysis run to a
 biota
 │  └──README.md
 |  └──bioregion_analysis
-|     └──socal_bioregion.qmd
-|     └──cencal_bioregion.qmd
-|     └──norcal_bioregion.qmd
+|     └──bioregion_central_biota_analysis.qmd
+|     └──bioregion_norcal_biota_analysis.qmd
+|     └──bioregion_socal_biota_analysis.qmd
 │  └──point_lobos_biota.qmd
 |  └──write_to_rds.qmd
 ```
