@@ -12,23 +12,79 @@ editor: visual
 librarian::shelf(tidyverse, dplyr, terra, tmap, sf, here, stars, janitor, units)
 ```
 
-### Load in our biota data
+### Load in the central California data
 
 ```{r}
-# Read in the pre-filtered Biota data set that only has CA observations
-biota_data <- readRDS("biota.rds")
+# Read in the prefiltered biota data from the database
+rds.dir <- "/capstone/marinebiomaps/data/rds-files"
+cencal_biota <- readRDS(file.path(rds.dir, "ccsr_biota.rds"))
 ```
 
 ```{r}
 # Remove the unclassified observations
-biota_clean <- biota_data %>%
+biota_clean <- cencal_biota %>%
   filter(cmecs_bc_category != "Unclassified")
 ```
 
+### Find Percentage of each Biota type in SoCal
+
 ```{r}
-# Filter to only Southern California biota
-centralcal_biota <- biota_clean %>%
-  filter(pmep_region == 3) # Our regions are numbered 1-4, north to south
+# Drop the geometries to speed up run time
+cencal_biota_simple <- biota_clean %>%
+  st_drop_geometry()
+```
+
+```{r}
+# Create a column that has the total area of socal biota
+cencal_biota_simple <- cencal_biota_simple %>%
+  mutate(total_area = sum(area_ha))
+
+# Create a sum of area column in mpa_transform
+cencal_biota_simple_2 <- cencal_biota_simple %>%
+  group_by(cmecs_bc_category) %>%  # Group by MPA type, substrate group
+  summarise(
+    biota_area = sum(area_ha, na.rm = TRUE),  
+    total_area = first(total_area)  
+  ) %>%
+  mutate(pct_biota = (biota_area / total_area) * 100)
+```
+
+```{r}
+# Find percentage of each biota in the SoCal
+# Visualize results
+# Find percentage of each biota in the SoCal
+# Visualize results
+ggplot(cencal_biota_simple_2, aes(x = reorder(cmecs_bc_category, pct_biota), y = pct_biota, fill = cmecs_bc_category)) +
+  geom_col() +
+  labs(title = " Biota Distribution in the \n\ Central California Bioregion (CCSR) MPAs",
+       y = "Percentage of Total Biota") +
+    geom_text(aes(label = paste0(round(pct_biota, 1), "%"), hjust = 0.5, vjust = 0.01, size= 1, family= "montserrat"),) +  
+  geom_text(aes(label = paste0(round(pct_biota, 1), "%"), hjust = 0.5, vjust = 0.01, size= 1, family= "montserrat")) +
+  theme_classic() +
+  scale_fill_manual(values = biota_pal) +
+  theme(plot.title = element_text(family= "montserrat", size= 15),
+        legend.position = "none",
+        legend.title = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y= element_text(size= 10, family= "montserrat"),
+    axis.title.y = element_blank(),
+    axis.title.x= element_text(size= 10, family= "montserrat")
+     )+
+  coord_flip()
+```
+
+### Load in our northern/central California data
+
+```{r}
+# Read in the prefiltered biota data from the database
+rds.dir <- "/capstone/marinebiomaps/data/rds-files"
+norcencal_biota <- readRDS(file.path(rds.dir, "nccsr_biota.rds"))
+```
+
+```{r}
+# Remove the unclassified observations
+biota_clean <- norcencal_biota %>%
+  filter(cmecs_bc_category != "Unclassified")
 ```
 
 ### Load in MPA Boundaries
@@ -41,47 +97,51 @@ MPA_boundary <- sf::st_read("data/California_Marine_Protected_Areas_[ds582]")
 mpa <- MPA_boundary %>%
    clean_names()
 ```
-### Join the Biota and MPAs
+
+### Find Percentage of each Biota type in SoCal
+
 ```{r}
-# Match the crs of the data
-centralcal_biota <- st_transform(centralcal_biota, crs= 32610)
-mpa <- st_transform(mpa, crs= 32610)
+# Drop the geometries to speed up run time
+norcencal_biota_simple <- biota_clean %>%
+  st_drop_geometry()
 ```
 
 ```{r}
-# Join the data sets together
-central_biota_mpa <- st_intersection(centralcal_biota, mpa)
-```
-
-### Calculate percentages of each biota type
-```{r}
-# Calculate area for each data set
-central_biota_mpa$mpa_area_m2 <- st_area(central_biota_mpa)
+# Create a column that has the total area of socal biota
+norcencal_biota_simple <- norcencal_biota_simple %>%
+  filter(cmecs_bc_category != "Floating/Suspended Plants and Macroalgae") %>%
+  filter(cmecs_bc_category != "Seagrass Bed") %>%
+  mutate(total_area = sum(area_ha))
 
 # Create a sum of area column in mpa_transform
-central_biota_mpa3 <- central_biota_mpa %>%
-  group_by(type, cmecs_bc_category) %>%  # Group by MPA type, substrate group
+norcencal_biota_simple_2 <- norcencal_biota_simple %>%
+  group_by(cmecs_bc_category) %>%  # Group by MPA type, substrate group
   summarise(
-    biota_area_m2 = sum(mpa_area_m2, na.rm = TRUE),  
-    total_mpa_area_m2 = first(shape_are)  
+    biota_area = sum(area_ha, na.rm = TRUE),  
+    total_area = first(total_area)  
   ) %>%
-  mutate(pct_biota = (biota_area_m2 / total_mpa_area_m2) * 100)
+  mutate(pct_biota = (biota_area / total_area) * 100)
 ```
 
-### Bar Graph of Biota Types within SoCal MPAs
 ```{r}
-# Find percentage of each biota in the MPA
+# Find percentage of each biota in the SoCal
 # Visualize results
-ggplot(central_biota_mpa3, aes(x = cmecs_bc_category, y = pct_biota, fill = cmecs_bc_category)) +
+ggplot(norcencal_biota_simple_2, aes(x = reorder(cmecs_bc_category, pct_biota), y = pct_biota, fill = cmecs_bc_category)) +
   geom_col() +
-  labs(title = "Biota type by Area(m2) in Central California",
-       x = "Biota Group",
-       y = "Percentage") +
-  geom_text(aes(label = round(pct_biota, 2), hjust = 0.5, vjust = 0.01)) +
-  theme_bw() +
-  scale_fill_manual(values = c('aquamarine3','#A5CEA4', 'pink', 'skyblue', 'lavender', 'seagreen', 'cadetblue' )) +
-  theme(plot.title = element_text(hjust = 0.5),
-        legend.position = "right",
+  labs(title = " Biota Distribution in the Northern-Central \n\ California Bioregion (NCCSR) MPAs",
+       y = "Percentage of Total Biota") +
+    geom_text(aes(label = paste0(round(pct_biota, 1), "%"), hjust = 0.5, vjust = 0.01, size= 1, family= "montserrat"),) +  
+  geom_text(aes(label = paste0(round(pct_biota, 1), "%"), hjust = 0.5, vjust = 0.01, size= 1, family= "montserrat")) +
+  theme_classic() +
+  scale_fill_manual(values = biota_pal) +
+  theme(plot.title = element_text(family= "montserrat", size= 15),
+        legend.position = "none",
         legend.title = element_blank(),
-    axis.text.x = element_blank() )
+    axis.text.x = element_blank(),
+    axis.text.y= element_text(size= 10, family= "montserrat"),
+    axis.title.y = element_blank(),
+    axis.title.x= element_text(size= 10, family= "montserrat")
+     )+
+  coord_flip()
 ```
+
