@@ -1,6 +1,20 @@
 # Biotic Components Analysis
 
-## Analysis conducted by Madison Enda to evaluate biotic cover and habitat distribution in California MPAs, as part of the MarineBioMaps Capstone Project. 
+## Author: Madison Enda 
+
+### Contributors: Bailey Jorgensen, Michelle Yiv, Cori Lopazanski, Samantha Stevenson-Karl
+
+This is a statewide and regional analysis, with summary statistics and mapping being conducted statewide, and also on a regional level. For the regional analysis, we utilized the 5 distinct regions defined by the California Department of Fish and Wildlife and the Marine Life Protection Act. They are definited as such:
+
+**SCSR** = South Coast Study Region
+
+**NCCSR** = North Central Coast Study Region
+
+**CCSR** = Central Coast Study Region
+
+**NCSR** = North Coast Study Region
+
+**SFBSR** = San Francisco Bay Study Region
 
 The Pacific Marine and Estuarine Partnership (PMEP) utilized the Coastal & Marine Ecological Classification Standard (CMECS) to define major biotic categories:
 
@@ -41,3 +55,22 @@ Zostera sp..
 .rds files created in the rds_creation repository from this MarineBioMaps Github Organization were used to load in the PMEP data filtered to California. See those repositories to access these .rds files. 
 
 Shapefiles for CA MPA Boundaries were downloaded from the [California Department of Fish and Wildlife](https://data.ca.gov/dataset/california-marine-protected-areas-ds582).
+
+### File Contents
+
+The Quarto Markdown files in this repository house the various analysis run to answer questions about MPA habitat components on a statewide, regional, or MPA specific level. The .qmd files are named for the respective areas being analyzed. 
+
+
+### Repository Structure:
+```
+biota
+│  └──README.md
+|  └──bioregion_analysis
+|     └──nccsr_substrate.qmd
+|     └──scsr_substrate.qmd
+|     └──ncsr_substrate.qmd
+|     └──ccsr_substrate.qmd
+│  └──pointlobos_substrate_analysis
+|  └──statewide_substrate_analysis
+|  └──saving_substrate_data
+```
