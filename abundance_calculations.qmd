@@ -1,0 +1,112 @@
+---
+title: "abundance_calculations"
+author: "Maddy Enda"
+format: html
+editor: visual
+---
+
+### Call libraries
+
+```{r}
+# Load in the packages for this data analysis
+librarian::shelf(tidyverse, dplyr, terra, tmap, sf, here, stars, janitor, units, showtext, knitr, kableExtra)
+# Adding in our text
+font_add_google("Montserrat", "montserrat")
+showtext_auto()
+```
+
+### Assign palette
+
+```{r}
+# Create palette
+biota_pal <- c("seagreen", "#A3AD62FF", "#D0D3A2", "#798234FF", "#F0C6C3FF", "#DF91A3FF", "#D46780FF" )
+```
+
+## Find total area of statewaters using substrate data
+
+```{r}
+# The total area of all substrate will be used as statewaters area
+
+# Read in data from primary substrate RDS
+rds.dir <- "/capstone/marinebiomaps/data/rds-files"
+substrate <- readRDS(file.path(rds.dir, "substrate.rds")) %>% st_drop_geometry() %>%
+  filter(cmecs_sc_category != "Unclassified")
+
+# Find total substrate area in MPAs for all MPAs
+total_ha_all_sub <- sum(substrate$area_ha, na.rm = TRUE)
+
+# Check statement
+print(paste0("The total area of substrate data in Ha: ", round(total_ha_all_sub)))
+
+# Remove scientific notation
+options(scipen = 999)
+```
+
+## Find area in hectares by biota category
+
+```{r}
+# Read in the prefiltered biota data from the database
+rds.dir <- "/capstone/marinebiomaps/data/rds-files"
+ca_biota <- readRDS(file.path(rds.dir, "biota.rds"))
+
+# Remove the unclassified observations
+ca_biota_clean <- ca_biota %>%
+  filter(cmecs_bc_category != "Unclassified")
+
+# Drop the geometries to speed up run time
+ca_biota_simple <- ca_biota_clean %>%
+  st_drop_geometry()
+
+# Create a column that has the total area of socal biota
+ca_biota_simple <- ca_biota_simple %>%
+  mutate(total_area = sum(area_ha))
+```
+
+## Find area in hectares from additional data sets
+
+```{r}
+# Unpack the biota layer and filter to only California observations
+estuary <- sf::read_sf(here::here("data", "PMEP_West_Coast_USA_Estuary_Extent_V1.gdb")) %>%
+  janitor::clean_names()
+
+# Project UTM 10 crs for calculating area
+estuary <- st_transform(estuary, crs= st_crs(32610))
+
+# Calculate area once more with st_area
+estuary$mpa_area_m <- st_area(estuary)
+estuary <- estuary %>%
+  mutate(mpa_area_ha = mpa_area_m / 1000)
+
+# Drop the geometries to speed up run time
+ca_estuary_simple <- estuary %>%
+  st_drop_geometry()
+
+# Create a column that has the total area of socal biota
+ca_estuary_simple <- ca_estuary_simple %>%
+  mutate(total_ha = sum(mpa_area_ha))
+```
+
+
+```{r}
+head(estuary)
+```
+```{r}
+total_ha_all_sub
+```
+
+```{r}
+unique(ca_biota_simple$total_area)
+```
+
+## Get absolute abundance for biota
+
+```{r}
+# Create a sum of area column in mpa_transform
+ca_biota_simple_2 <- ca_biota_simple %>%
+  group_by(cmecs_bc_category) %>%  # Group by MPA type, substrate group
+  summarise(
+    biota_area = sum(area_ha, na.rm = TRUE),
+  ) %>%
+  mutate(pct_biota = (biota_area / total_ha_all_sub) * 100)
+```
+
