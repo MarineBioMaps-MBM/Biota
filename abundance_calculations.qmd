@@ -62,34 +62,6 @@ ca_biota_simple <- ca_biota_simple %>%
   mutate(total_area = sum(area_ha))
 ```
 
-## Find area in hectares from additional data sets
-
-```{r}
-# Unpack the biota layer and filter to only California observations
-estuary <- sf::read_sf(here::here("data", "PMEP_West_Coast_USA_Estuary_Extent_V1.gdb")) %>%
-  janitor::clean_names()
-
-# Project UTM 10 crs for calculating area
-estuary <- st_transform(estuary, crs= st_crs(32610))
-
-# Calculate area once more with st_area
-estuary$mpa_area_m <- st_area(estuary)
-estuary <- estuary %>%
-  mutate(mpa_area_ha = mpa_area_m / 1000)
-
-# Drop the geometries to speed up run time
-ca_estuary_simple <- estuary %>%
-  st_drop_geometry()
-
-# Create a column that has the total area of socal biota
-ca_estuary_simple <- ca_estuary_simple %>%
-  mutate(total_ha = sum(mpa_area_ha))
-```
-
-
-```{r}
-head(estuary)
-```
 ```{r}
 total_ha_all_sub
 ```
@@ -103,7 +75,7 @@ unique(ca_biota_simple$total_area)
 ```{r}
 # Create a sum of area column in mpa_transform
 ca_biota_simple_2 <- ca_biota_simple %>%
-  group_by(cmecs_bc_category) %>%  # Group by MPA type, substrate group
+  group_by(cmecs_bc_category) %>%  
   summarise(
     biota_area = sum(area_ha, na.rm = TRUE),
   ) %>%
