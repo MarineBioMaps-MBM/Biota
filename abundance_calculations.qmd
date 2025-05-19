@@ -5,7 +5,7 @@ format: html
 editor: visual
 ---
 
-### Call libraries
+## Call libraries
 
 ```{r}
 # Load in the packages for this data analysis
@@ -15,34 +15,42 @@ font_add_google("Montserrat", "montserrat")
 showtext_auto()
 ```
 
-### Assign palette
+## Assign palette
 
 ```{r}
 # Create palette
 biota_pal <- c("seagreen", "#A3AD62FF", "#D0D3A2", "#798234FF", "#F0C6C3FF", "#DF91A3FF", "#D46780FF" )
 ```
 
-## Find total area of statewaters using substrate data
+## Statewide Analysis:
+
+### Find the total area of state waters using the state water boundary
 
 ```{r}
-# The total area of all substrate will be used as statewaters area
-
-# Read in data from primary substrate RDS
-rds.dir <- "/capstone/marinebiomaps/data/rds-files"
-substrate <- readRDS(file.path(rds.dir, "substrate.rds")) %>% st_drop_geometry() %>%
-  filter(cmecs_sc_category != "Unclassified")
-
-# Find total substrate area in MPAs for all MPAs
-total_ha_all_sub <- sum(substrate$area_ha, na.rm = TRUE)
-
-# Check statement
-print(paste0("The total area of substrate data in Ha: ", round(total_ha_all_sub)))
-
-# Remove scientific notation
-options(scipen = 999)
+# Read in the study regions data
+state_boundaries <-  sf::st_read("MLPA_Study_Regions")
 ```
 
-## Find area in hectares by biota category
+```{r}
+# Transform to the UTM 10N crs for California
+state_boundary_transform <- st_transform(state_boundaries, crs= 32610)
+statewater_area <- sum(st_area(state_boundary_transform) / 10000)
+```
+
+```{r}
+# Calculate area in hectares
+sr_boundaries <- state_boundary_transform |>
+  mutate(area_ha = as.numeric(st_area(geometry)) / 10000)
+```
+
+```{r}
+scsr_area <- 795004.7
+ccsr_area <- 296913.5
+nccsr_area <- 197503.2
+ncsr_area <- 266790.1
+```
+
+### Find area in hectares by biota category
 
 ```{r}
 # Read in the prefiltered biota data from the database
@@ -63,14 +71,14 @@ ca_biota_simple <- ca_biota_simple %>%
 ```
 
 ```{r}
-total_ha_all_sub
+statewater_area
 ```
 
 ```{r}
 unique(ca_biota_simple$total_area)
 ```
 
-## Get absolute abundance for biota
+### Get absolute abundance for biota
 
 ```{r}
 # Create a sum of area column in mpa_transform
@@ -79,6 +87,378 @@ ca_biota_simple_2 <- ca_biota_simple %>%
   summarise(
     biota_area = sum(area_ha, na.rm = TRUE),
   ) %>%
-  mutate(pct_biota = (biota_area / total_ha_all_sub) * 100)
+  mutate(pct_biota = (biota_area / statewater_area) * 100)
 ```
+
+```{r}
+ # Create table
+kable(ca_biota_simple_2, col.names = c("Biota Category", "Area in hectares", "Percent of Total Statewaters")) %>%
+  kable_material(c("striped", "hover"))
+```
+
+### Repeating our calculations within the MPA system
+
+```{r}
+# Load in the MPA boundary data
+MPA_boundary <- sf::st_read("data/California_Marine_Protected_Areas_[ds582]")
+
+# Filter to Point Lobos locations
+mpa <- MPA_boundary %>%
+   clean_names()
+```
+
+```{r}
+# Reproject to UTM 10
+mpa_transform <- st_transform(mpa, crs= 32610)
+mpa_area <-  sum(st_area(mpa_transform) / 10000)
+```
+
+```{r}
+# Join the data sets together
+ca_biota_mpa <- st_intersection(ca_biota_clean, mpa_transform)
+```
+
+```{r}
+ca_biota_mpa$biota_area_ha = (st_area(ca_biota_mpa) / 10000)
+```
+
+```{r}
+# Remove geometries to run faster
+ca_biota_mpa_simple <- ca_biota_mpa %>%
+  st_drop_geometry()
+```
+
+```{r}
+# Create a sum of area column in mpa_transform
+ca_biota_mpa_2 <- ca_biota_mpa_simple %>%
+  group_by(cmecs_bc_category) %>%  # Group by MPA type, substrate group
+  summarise(
+    biota_cat_ha = sum(biota_area_ha, na.rm = TRUE),
+  ) %>%
+  mutate(pct_biota = (biota_cat_ha / 262882) * 100)
+```
+
+```{r}
+ # Create table
+kable(ca_biota_mpa_2, col.names = c("Biota Category", "Area in hectares", "Percent of Total MPA Area")) %>%
+  kable_material(c("striped", "hover"))
+```
+
+## Abundance in SCSR:
+
+### Region wide:
+
+```{r}
+# Make regional boundaries
+scsr <- state_boundary_transform %>%
+  filter(Study_Regi == "SCSR")
+
+ccsr <- state_boundary_transform %>%
+  filter(Study_Regi == "CCSR")
+
+nccsr <- state_boundary_transform %>%
+  filter(Study_Regi == "NCCSR")
+
+ncsr <- state_boundary_transform %>%
+  filter(Study_Regi == "NCSR")
+```
+
+```{r}
+# Make valid the scsr geometry
+scsr <- scsr %>% 
+  st_make_valid()
+
+# Find all biota in scsr region
+scsr_biota <- st_intersection(scsr,ca_biota_clean)
+```
+
+```{r}
+# Remove the unclassified observations
+scsr_biota_clean <- scsr_biota %>%
+  filter(cmecs_bc_category != "Unclassified")
+
+# Drop geometries for ease of processing
+scsr_biota_simple <- scsr_biota_clean %>%
+  st_drop_geometry()
+
+# Create a sum of area column in mpa_transform
+biota_scsr <- scsr_biota_simple %>%
+  group_by(cmecs_bc_category) %>%  # Group by MPA type, substrate group
+  summarise(
+    biota_area = sum(area_ha, na.rm = TRUE),
+  ) %>%
+  mutate(pct_biota = (biota_area /scsr_area) * 100)
+```
+
+```{r}
+ # Create table
+kable(biota_scsr, col.names = c("Biota Category", "Area in hectares", "Percent of Total SCSR Area")) %>%
+  kable_material(c("striped", "hover"))
+```
+
+### In SCSR MPAs:
+
+```{r}
+# Read in the prefiltered biota data from the database
+rds.dir <- "/capstone/marinebiomaps/data/rds-files"
+socal_biota <- readRDS(file.path(rds.dir, "scsr_biota.rds"))
+```
+
+```{r}
+# Reproject to crs for WGS84 UTM zone 10N
+socal_biota_transform <- st_transform(socal_biota, crs = 32610)
+
+# Calculate area in hectares
+socal_biota_transform$socal_ha <- (st_area(socal_biota_transform) / 10000)
+
+# Remove the unclassified observations
+socal_biota_clean <- socal_biota_transform %>%
+  filter(cmecs_bc_category != "Unclassified")
+
+# Drop geometries for ease of processing
+socal_biota_simple <- socal_biota_clean %>%
+  st_drop_geometry()
+
+# Create a sum of area column in mpa_transform
+socal_biota_simple_2 <- socal_biota_simple %>%
+  group_by(cmecs_bc_category) %>%  # Group by MPA type, substrate group
+  summarise(
+    biota_area = sum(socal_ha, na.rm = TRUE),
+  ) %>%
+  mutate(pct_biota = (biota_area /scsr_area ) * 100)
+```
+
+
+```{r}
+ # Create table
+kable(socal_biota_simple_2, col.names = c("Biota Category", "Area in hectares", "Percent of Total South Coast Region")) %>%
+  kable_material(c("striped", "hover"))
+```
+
+## Abundance in CCSR:
+
+### In CCSR region
+
+```{r}
+# Make valid the scsr geometry
+ccsr <- ccsr %>% 
+  st_make_valid()
+
+# Find all biota in scsr region
+ccsr_biota <- st_intersection(ccsr,ca_biota_clean)
+```
+
+```{r}
+# Remove the unclassified observations
+ccsr_biota_clean <- ccsr_biota %>%
+  filter(cmecs_bc_category != "Unclassified")
+
+# Drop geometries for ease of processing
+ccsr_biota_simple <- ccsr_biota_clean %>%
+  st_drop_geometry()
+
+# Create a sum of area column in mpa_transform
+biota_ccsr <- ccsr_biota_simple %>%
+  group_by(cmecs_bc_category) %>%  # Group by MPA type, substrate group
+  summarise(
+    biota_area = sum(area_ha, na.rm = TRUE),
+  ) %>%
+  mutate(pct_biota = (biota_area /ccsr_area) * 100)
+```
+
+```{r}
+ # Create table
+kable(biota_ccsr, col.names = c("Biota Category", "Area in hectares", "Percent of Total Central Coast Region")) %>%
+  kable_material(c("striped", "hover"))
+```
+
+### In CCSR MPAs:
+
+```{r}
+# Read in the prefiltered biota data from the database
+rds.dir <- "/capstone/marinebiomaps/data/rds-files"
+central_biota <- readRDS(file.path(rds.dir, "ccsr_biota.rds"))
+```
+
+```{r}
+# Reproject to crs for WGS84 UTM zone 10N
+cencal_biota_transform <- st_transform(central_biota, crs = 32610)
+
+# Calculate area in hectares
+cencal_biota_transform$cencal_ha <- (st_area(cencal_biota_transform) / 10000)
+
+# Remove the unclassified observations
+cencal_biota_clean <- cencal_biota_transform %>%
+  filter(cmecs_bc_category != "Unclassified")
+
+# Drop geometries for ease of processing
+cencal_biota_simple <- cencal_biota_clean %>%
+  st_drop_geometry()
+
+# Create a sum of area column in mpa_transform
+cencal_biota_simple_2 <- cencal_biota_simple %>%
+  group_by(cmecs_bc_category) %>%  # Group by MPA type, substrate group
+  summarise(
+    biota_area = sum(cencal_ha, na.rm = TRUE),
+  ) %>%
+  mutate(pct_biota = (biota_area /ccsr_area ) * 100)
+```
+
+```{r}
+ # Create table
+kable(cencal_biota_simple_2, col.names = c("Biota Category", "Area in hectares", "Percent of Total Central Coast Region MPAS")) %>%
+  kable_material(c("striped", "hover"))
+```
+
+## Abundance in NCCSR:
+
+### In NCCSR Region
+
+```{r}
+# Make valid the scsr geometry
+nccsr <- nccsr %>% 
+  st_make_valid()
+
+# Find all biota in scsr region
+nccsr_biota <- st_intersection(nccsr,ca_biota_clean)
+```
+
+```{r}
+# Remove the unclassified observations
+nccsr_biota_clean <- nccsr_biota %>%
+  filter(cmecs_bc_category != "Unclassified")
+
+# Drop geometries for ease of processing
+nccsr_biota_simple <- nccsr_biota_clean %>%
+  st_drop_geometry()
+
+# Create a sum of area column in mpa_transform
+biota_nccsr <- nccsr_biota_simple %>%
+  group_by(cmecs_bc_category) %>%  # Group by MPA type, substrate group
+  summarise(
+    biota_area = sum(area_ha, na.rm = TRUE),
+  ) %>%
+  mutate(pct_biota = (biota_area /nccsr_area) * 100)
+```
+
+```{r}
+ # Create table
+kable(biota_nccsr, col.names = c("Biota Category", "Area in hectares", "Percent of Total North Central Coast Region")) %>%
+  kable_material(c("striped", "hover"))
+```
+
+### In NCCSR MPAs
+
+```{r}
+# Read in the prefiltered biota data from the database
+rds.dir <- "/capstone/marinebiomaps/data/rds-files"
+nccsr_biota <- readRDS(file.path(rds.dir, "nccsr_biota.rds"))
+```
+
+```{r}
+# Reproject to crs for WGS84 UTM zone 10N
+nccsr_biota_transform <- st_transform(nccsr_biota, crs = 32610)
+
+# Calculate area in hectares
+nccsr_biota_transform$nccsr_ha <- (st_area(nccsr_biota_transform) / 10000)
+
+# Remove the unclassified observations
+nccsr_biota_clean <- nccsr_biota_transform %>%
+  filter(cmecs_bc_category != "Unclassified")
+
+# Drop geometries for ease of processing
+nccsr_biota_simple <- nccsr_biota_clean %>%
+  st_drop_geometry()
+
+# Create a sum of area column 
+nccsr_biota_simple_2 <- nccsr_biota_simple %>%
+  group_by(cmecs_bc_category) %>%  
+  summarise(
+    biota_area = sum(nccsr_ha, na.rm = TRUE),
+  ) %>%
+  mutate(pct_biota = (biota_area /nccsr_area ) * 100)
+```
+
+```{r}
+ # Create table
+kable(nccsr_biota_simple_2, col.names = c("Biota Category", "Area in hectares", "Percent of Total North Central Coast Region")) %>%
+  kable_material(c("striped", "hover"))
+```
+
+## Abundance in NCSR:
+
+### In the NCSR Region:
+
+```{r}
+# Make valid the scsr geometry
+ncsr <- ncsr %>% 
+  st_make_valid()
+
+# Find all biota in scsr region
+ncsr_biota <- st_intersection(ncsr,ca_biota_clean)
+```
+
+```{r}
+# Remove the unclassified observations
+ncsr_biota_clean <- ncsr_biota %>%
+  filter(cmecs_bc_category != "Unclassified")
+
+# Drop geometries for ease of processing
+ncsr_biota_simple <- ncsr_biota_clean %>%
+  st_drop_geometry()
+
+# Create a sum of area column in mpa_transform
+biota_ncsr <- ncsr_biota_simple %>%
+  group_by(cmecs_bc_category) %>%  # Group by MPA type, substrate group
+  summarise(
+    biota_area = sum(area_ha, na.rm = TRUE),
+  ) %>%
+  mutate(pct_biota = (biota_area /ncsr_area) * 100)
+```
+
+```{r}
+ # Create table
+kable(biota_ncsr, col.names = c("Biota Category", "Area in hectares", "Percent of Total North Coast Region")) %>%
+  kable_material(c("striped", "hover"))
+```
+
+### In NCSR MPAs
+
+```{r}
+# Read in the prefiltered biota data from the database
+rds.dir <- "/capstone/marinebiomaps/data/rds-files"
+ncsr_biota <- readRDS(file.path(rds.dir, "ncsr_biota.rds"))
+```
+
+```{r}
+# Reproject to crs for WGS84 UTM zone 10N
+norcal_biota_transform <- st_transform(ncsr_biota, crs = 32610)
+
+# Calculate area in hectares
+norcal_biota_transform$norcal_ha <- (st_area(norcal_biota_transform) / 10000)
+
+# Remove the unclassified observations
+norcal_biota_clean <- norcal_biota_transform %>%
+  filter(cmecs_bc_category != "Unclassified")
+
+# Drop geometries for ease of processing
+norcal_biota_simple <- norcal_biota_clean %>%
+  st_drop_geometry()
+
+# Create a sum of area column in mpa_transform
+norcal_biota_simple_2 <- norcal_biota_simple %>%
+  group_by(cmecs_bc_category) %>%  # Group by MPA type, substrate group
+  summarise(
+    biota_area = sum(norcal_ha, na.rm = TRUE),
+  ) %>%
+  mutate(pct_biota = (biota_area /ncsr_area ) * 100)
+```
+
+```{r}
+ # Create table
+kable(norcal_biota_simple_2, col.names = c("Biota Category", "Area in hectares", "Percent of Total North Coast Region MPAs")) %>%
+  kable_material(c("striped", "hover"))
+```
+
+
 

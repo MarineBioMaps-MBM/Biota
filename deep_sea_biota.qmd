@@ -1,0 +1,173 @@
+---
+title: "deep_sea_biota"
+author: "Maddy Enda"
+format: html
+editor: visual
+---
+
+
+### Load packages, presets, and data
+
+```{r}
+# Load in the packages for this data analysis
+librarian::shelf(tidyverse, dplyr, terra, tmap, sf, here, stars, janitor, units, showtext)
+```
+
+```{r}
+# Adding in our text
+font_add_google("Montserrat", "montserrat")
+showtext_auto()
+
+# Create palette
+biota_pal <- c("darkseagreen", "seagreen", "palegreen", "#A3AD62FF", "#D0D3A2", "#798234FF", "#F0C6C3FF", "#DF91A3FF", "#D46780FF", "aquamarine", "lightblue", "cadetblue", "lavender", "thistle", "plum", "peachpuff" )
+```
+
+
+```{r}
+# Read in the prefiltered biota data from the database
+rds.dir <- "/capstone/marinebiomaps/data"
+deep_sea_biota <- read_csv(file.path(rds.dir, "DSCRTP_NatDB_20250409-0.csv"))
+```
+
+### Filter and clean
+```{r}
+# Filter to only North Pacific values
+pacific_deep_sea <- deep_sea_biota %>%
+  filter(Ocean == "North Pacific")
+
+# Filter to only North Pacific values
+CA_deep_sea <- pacific_deep_sea %>%
+  filter(LargeMarineEcosystem %in% c("California Current", "Gulf of California"))
+```
+
+```{r}
+CA_deep_sea <- CA_deep_sea %>%
+   st_as_sf(coords=c("Longitude", "Latitude"), crs= 32610, remove=FALSE)
+```
+
+```{r}
+head(CA_deep_sea)
+```
+
+```{r}
+tm_shape(CA_deep_sea)+
+  tm_dots() 
+```
+### Select relevant columns and manipulate data
+```{r}
+# Remove NA for counts
+CA_deep_sea <- CA_deep_sea %>%
+  filter(IndividualCount != -999)
+
+# Select only relevant columns for initial data vis
+coral_data_simple <- CA_deep_sea%>%
+  select(c('ScientificName',
+          'VernacularNameCategory',
+          'Phylum',
+          'Class',
+          'Order',
+          'Family',
+          'Genus',
+          'Locality',
+          'Latitude',
+          'Longitude',
+          'DepthInMeters',
+          'ObservationDate',
+          'ObservationYear',
+          'IndividualCount'))
+```
+
+```{r}
+ca_deep_simple <- coral_data_simple %>%
+  st_drop_geometry()
+```
+
+```{r}
+# Convert the depth column to integers
+ca_deep_simple$DepthInMeters <- as.integer(ca_deep_simple$DepthInMeters)
+
+# Create a df with the mean counts by year and taxa Class
+mean_count_class <- ca_deep_simple %>%
+  group_by(Family, ObservationYear) %>%
+  summarise(sum_count = sum(IndividualCount))
+```
+
+### Plotting information
+
+```{r}
+ggplot(ca_deep_simple, aes(x= ObservationYear)) +
+  geom_bar() +
+  scale_x_continuous(limits = c(1995, 2025)) +
+  theme_classic()
+```
+
+```{r}
+# Create a colummn that is the sum of all counts
+ca_deep_simple <- ca_deep_simple %>%
+  mutate(total_counts= sum(IndividualCount))
+
+# Find the sum of counts for each common name biota
+coral_data_counts <-ca_deep_simple %>%
+  group_by(VernacularNameCategory) %>%
+  mutate(sum_counts = sum(IndividualCount),
+         total_biota= first(total_counts))
+
+coral_data_counts <- coral_data_counts %>%
+  mutate(pct_biota = (sum_counts / total_biota) * 100) 
+```
+
+```{r}
+tail(coral_data_counts)
+```
+```{r}
+VernacularName_biota <- coral_data_counts %>%
+  select(VernacularNameCategory, pct_biota)
+
+unique(VernacularName_biota$VernacularNameCategory)
+```
+```{r}
+options(scipen = 999)
+```
+
+
+```{r}
+unique(VernacularName_biota$pct_biota)
+```
+
+
+
+
+
+
+
+
+
+```{r}
+filtered_common <- VernacularName_biota %>%
+  filter(!VernacularNameCategory %in% c("sponge", "gorgonian coral"))
+```
+
+
+```{r}
+# Visualize results
+ggplot(filtered_common, aes(x = pct_biota, y = reorder(VernacularNameCategory,pct_biota), fill = VernacularNameCategory)) +
+  geom_col() +
+  labs(
+    title =  " California Deep Sea Biota Abundance within CA",
+    x = "Total Counts",
+    y = "VernacularNameCategory"
+  ) +
+  scale_fill_manual(values = biota_pal)
+```
+```{r}
+# Visualize results
+ggplot(VernacularName_biota, aes(x = pct_biota, y = reorder(VernacularNameCategory,pct_biota), fill = VernacularNameCategory)) +
+  geom_col() +
+  labs(
+    title =  " California Deep Sea Biota Abundance within CA",
+    x = "Percent of Total Biota (%)",
+    y = "VernacularNameCategory"
+  ) +
+  scale_fill_manual(values = biota_pal)
+```
+

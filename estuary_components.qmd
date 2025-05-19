@@ -1,0 +1,167 @@
+---
+title: "estuary_components"
+author: "Maddy Enda"
+format: html
+editor: visual
+---
+
+```{r}
+# Load in the packages for this data analysis
+librarian::shelf(tidyverse, dplyr, terra, tmap, sf, here, stars, janitor, units, showtext)
+```
+
+```{r}
+# Adding in our text
+font_add_google("Montserrat", "montserrat")
+showtext_auto()
+
+# Create palette
+biota_pal <- c("seagreen", "#A3AD62FF", "#D0D3A2", "#798234FF", "#F0C6C3FF", "#DF91A3FF", "#D46780FF" )
+```
+
+```{r}
+# Unpack the biota layer and filter to only California observations
+estuary <- sf::read_sf(here::here("data", "PMEP_West_Coast_USA_Estuary_Extent_V1.gdb")) %>%
+  janitor::clean_names()
+```
+
+```{r}
+# Load in the MPA boundary data
+MPA_boundary <- sf::st_read("data/California_Marine_Protected_Areas_[ds582]")
+
+# Make the colummn names lower snakecase
+mpa <- MPA_boundary %>%
+   clean_names()
+```
+
+```{r}
+# Match the crs of the two data sets
+estuary <- st_transform(estuary, crs= st_crs(mpa))
+```
+
+```{r}
+# Join the data sets together
+estuary_mpa <- st_intersection(estuary, mpa)
+```
+
+-   We get an error here that tells us the geometries are multisurface and not compatible with multipolygons.
+
+```{r}
+# Make the multisurface geometries of the estuary data set vaild sf objects
+estuary_valid <- st_as_sf(estuary)
+
+# Convert to a multipolygon type
+estuary_polygon <-st_cast(estuary_valid, "MULTIPOLYGON")
+```
+
+```{r}
+# Join the data sets together
+estuary_mpa <- st_intersection(estuary_polygon, mpa)
+```
+
+-   Success! We have them matched and have taken the intersection
+
+### Find percent of CA that is biota
+
+```{r}
+{r}
+# Create a column that has the total area of socal biota
+ca_biota_simple <- ca_biota_simple %>%
+  filter(cmecs_bc_category != "Floating/Suspended Plants and Macroalgae") %>%
+  mutate(total_area = sum(area_ha))
+
+# Create a sum of area column in mpa_transform
+ca_biota_simple_2 <- ca_biota_simple %>%
+  group_by(cmecs_bc_category) %>%  # Group by MPA type, substrate group
+  summarise(
+    biota_area = sum(area_ha, na.rm = TRUE),  
+    total_area = first(total_area)  
+  ) %>%
+  mutate(pct_biota = (biota_area / total_area) * 100)
+```
+
+### Find percent of MPAs that are biota
+
+```{r}
+head(estuary_mpa)
+```
+
+```{r}
+# Calculate area once more with st_area
+estuary_mpa$mpa_area_m <- st_area(estuary_mpa)
+estuary_mpa <- estuary_mpa %>%
+  mutate(mpa_area_ha = mpa_area_m / 1000)
+
+# Drop the geometries to speed up run time
+estuary_mpa_simple <- estuary_mpa %>%
+  st_drop_geometry()
+```
+
+```{r}
+# Create a column that has the total area of socal biota
+estuary_mpa_simple <- estuary_mpa_simple %>%
+  mutate(total_mpa_ha = sum(mpa_area_ha))
+
+# Create a sum of area column in mpa_transform
+estuary_mpa_simple_2 <- estuary_mpa_simple %>%
+  group_by(cmecs_class) %>%  # Group by MPA type, substrate group
+  summarise(
+    estuary_area = sum(mpa_area_ha, na.rm = TRUE),  
+    total_area = first(total_mpa_ha)  
+  ) %>%
+  mutate(pct_biota = (estuary_area / total_area) * 100)
+```
+
+```{r}
+ggplot(estuary_mpa_simple_2, aes(x = pct_biota, y = reorder(cmecs_class, pct_biota), fill = cmecs_class)) +
+  geom_col() +
+  labs(
+    title = " Estuary Type Distribution \n\ within the CA MPA Network",
+    x= "Percent of Total Estuary Area",
+    y = "PMEP Biotic Class"
+  ) +
+  scale_fill_manual(values = biota_pal) +
+  theme_classic() +
+  theme(text = element_text(family = "montserrat", size = 15),
+        title = element_text(family= "montserrat", size= 13),
+    legend.position = 'none',
+    axis.text.x = element_text(hjust = 1)) +
+  geom_label(aes(label = paste0(round(pct_biota, 1), "%")),
+             fill = "white", 
+             color = "black",
+             hjust = 0,    # Align to left
+             x = 1,        # Set near y-axis (adjust as needed)
+             size = 3.5) +
+  scale_y_discrete(labels = function(x) str_wrap(x, width = 20))
+```
+
+```{r}
+tm_shape(estuary_polygon) +
+  tm_polygons()
+```
+
+
+```{r}
+```{r}
+# Unpack the biota layer and filter to only California observations
+estuary <- sf::read_sf(here::here("data", "PMEP_West_Coast_USA_Estuary_Extent_V1.gdb")) %>%
+  janitor::clean_names()
+
+# Project UTM 10 crs for calculating area
+estuary <- st_transform(estuary, crs= st_crs(32610))
+
+# Calculate area once more with st_area
+estuary$mpa_area_m <- st_area(estuary)
+estuary <- estuary %>%
+  mutate(mpa_area_ha = mpa_area_m / 1000)
+
+# Drop the geometries to speed up run time
+ca_estuary_simple <- estuary %>%
+  st_drop_geometry()
+
+# Create a column that has the total area of socal biota
+ca_estuary_simple <- ca_estuary_simple %>%
+  mutate(total_ha = sum(mpa_area_ha))
+```
+```
+
