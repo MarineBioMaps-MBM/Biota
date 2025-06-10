@@ -1,0 +1,84 @@
+---
+title: "eelgrass_data"
+author: "Maddy Enda"
+format: html
+editor: visual
+---
+
+```{r}
+# Load in the packages for this data analysis
+librarian::shelf(tidyverse, dplyr, terra, tmap, sf, here, stars, janitor, units, showtext)
+```
+
+```{r}
+# Adding in our text
+font_add_google("Montserrat", "montserrat")
+showtext_auto()
+
+# Create palette
+biota_pal <- c("seagreen", "#A3AD62FF", "#D0D3A2", "#798234FF", "#F0C6C3FF", "#DF91A3FF", "#D46780FF" )
+```
+
+```{r}
+eelgrass.dir <- "/capstone/marinebiomaps/data/PMEP_eelgrass"
+eelgrass.gdb <- file.path(eelgrass.dir, "PMEP_West_Coast_Eelgrass_V1.gdb")
+
+# Read in appropriate layer
+eelgrass <- st_read(eelgrass.gdb, layer = "PMEP_WestCoast_USA_Eelgrass_Extent")
+```
+
+```{r}
+# Reproject to our crs
+eelgrass_transform <- st_transform(eelgrass, crs= 32610)
+```
+
+```{r}
+colnames(eelgrass_transform)
+```
+
+```{r}
+simple_eelgrass <- eelgrass_transform %>%
+  select(EelgrassUID, EstuaryName, AreaType, CMECS_BIO, Shape_Area, CurrentYear, Shape)
+```
+
+### Read in the statewater boundaries to find eelgrass in CA
+
+```{r}
+# Read in the study regions data
+state_boundaries <-  sf::st_read("MLPA_Study_Regions")
+```
+
+```{r}
+# Transform to the UTM 10N crs for California
+state_boundary_transform <- st_transform(state_boundaries, crs= 32610) %>% st_make_valid()
+statewater_area <- sum(st_area(state_boundary_transform) / 10000)
+
+# Calculate area in hectares
+sr_boundaries <- state_boundary_transform |>
+  mutate(area_ha = as.numeric(st_area(geometry)) / 10000)
+```
+
+### Find Eelgrass statewide
+
+```{r}
+# Intersect estuaries with statewaters
+ca_eelgrass <- st_intersection(state_boundary_transform, simple_eelgrass)
+```
+
+```{r}
+# Calculate area once more with st_area
+ca_eelgrass$area_ha = (st_area(ca_eelgrass) / 10000)
+```
+
+```{r}
+# Remove geometries
+eelgrass_simple <- ca_eelgrass %>% st_drop_geometry()
+
+# Create a sum of area column in mpa_transform
+eelgrass_simple <- eelgrass_simple %>%
+  group_by(AreaType)
+  summarise(
+    estuary_area = sum(area_ha, na.rm = TRUE)
+  ) %>%
+  mutate(pct_biota = (estuary_area / statewater_area) * 100)
+```
